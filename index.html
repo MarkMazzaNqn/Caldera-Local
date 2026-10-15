@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Clientes, mantenimientos anuales de calderas, pagos pendientes y recordatorios por WhatsApp. Funciona sin internet.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-src 'none'">
+<meta name="theme-color" content="#c2410c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<title>Mantenimiento de calderas</title>
+<style>
+  :root { --brand:#c2410c; --bg:#f5f5f4; --card:#fff; --line:#e7e5e4; --text:#1c1917; --muted:#78716c; --ok:#15803d; --bad:#b91c1c; --warn:#b45309; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; }
+  body { font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); font-size:16px; line-height:1.4; -webkit-tap-highlight-color:transparent; }
+  #app { max-width:680px; margin:0 auto; min-height:100vh; min-height:100dvh; background:var(--bg); position:relative; }
+
+  header { background:var(--brand); color:#fff; padding:12px 16px; padding-top:calc(12px + env(safe-area-inset-top)); display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:5; }
+  .logo { width:42px; height:42px; border-radius:10px; background:rgba(255,255,255,.22); display:grid; place-items:center; font-weight:700; font-size:20px; overflow:hidden; flex:none; }
+  .logo img { width:100%; height:100%; object-fit:contain; background:#fff; }
+  header h1 { font-size:17px; margin:0; font-weight:650; line-height:1.2; }
+  header small { opacity:.85; font-size:13px; }
+
+  main { padding:16px; padding-bottom:calc(88px + env(safe-area-inset-bottom)); display:grid; gap:14px; }
+  h2 { font-size:15px; margin:6px 0 0; }
+  h2 .count { font-weight:400; color:var(--muted); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; }
+  .card.due { border-left:5px solid var(--warn); }
+  .card.late { border-left-color:var(--bad); }
+  .row { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .muted { color:var(--muted); font-size:14px; }
+  .ok { color:var(--ok); font-size:13px; margin-top:6px; }
+  .chip { font-size:12px; border-radius:99px; padding:2px 9px; background:var(--bg); border:1px solid var(--line); color:var(--muted); white-space:nowrap; }
+  .chip.warn { background:#fef3c7; border-color:#fcd34d; color:#92400e; }
+  .chip.bad { background:#fee2e2; border-color:#fca5a5; color:#991b1b; }
+  .chip.good { background:#dcfce7; border-color:#86efac; color:#166534; }
+  .quick { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .quick .btn { padding:14px 10px; font-size:15px; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+  .item[data-act] { cursor:pointer; }
+
+  input, textarea, select { width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:8px; font:inherit; background:#fff; color:var(--text); }
+  textarea { min-height:78px; resize:vertical; }
+  label { display:block; font-size:13px; font-weight:600; margin:12px 0 4px; }
+  label .req { color:var(--bad); }
+  label .opt { color:var(--muted); font-weight:400; }
+  .hint { font-size:12px; color:var(--muted); margin-top:4px; }
+
+  .btn { display:inline-block; font:inherit; font-weight:600; font-size:15px; border:0; border-radius:8px; padding:10px 14px; cursor:pointer; text-decoration:none; text-align:center; background:var(--brand); color:#fff; }
+  .btn.ghost { background:#fff; color:var(--text); border:1px solid var(--line); font-weight:500; }
+  .btn.wa { background:#16a34a; }
+  .btn.danger { background:var(--bad); }
+  .btn.small { padding:6px 10px; font-size:13px; }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .actions > * { flex:1 1 auto; }
+
+  .item { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:12px 14px; background:var(--card); border:1px solid var(--line); border-radius:12px; color:inherit; text-decoration:none; }
+  .item b { display:block; }
+  .item .muted { font-size:13px; }
+  .chev { color:var(--muted); font-size:22px; flex:none; }
+  .list { display:grid; gap:8px; }
+  .top { display:flex; gap:8px; }
+  .top input { flex:1; }
+  .top .btn { flex:none; }
+
+  .fields { display:grid; gap:8px; margin-top:8px; font-size:14px; }
+  .fields b { display:block; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; font-weight:600; }
+  .fields div { white-space:pre-wrap; }
+
+  .empty { text-align:center; color:var(--muted); padding:26px 10px; }
+  .back { color:var(--brand); text-decoration:none; font-weight:600; font-size:15px; }
+  .banner { background:#fef3c7; border:1px solid #fcd34d; color:#92400e; border-radius:10px; padding:10px 12px; font-size:14px; }
+
+  nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:680px; background:#fff; border-top:1px solid var(--line); display:flex; padding-bottom:env(safe-area-inset-bottom); z-index:6; }
+  nav a { flex:1; text-align:center; padding:9px 4px 8px; color:var(--muted); text-decoration:none; font-size:12px; }
+  nav a span { display:block; font-size:21px; line-height:1.1; }
+  nav a.on { color:var(--brand); font-weight:700; }
+
+  dialog { border:0; border-radius:14px; padding:0; width:min(520px, calc(100% - 24px)); max-height:90vh; box-shadow:0 10px 40px rgba(0,0,0,.3); color:var(--text); }
+  dialog::backdrop { background:rgba(0,0,0,.45); }
+  .dlgbody { padding:16px; overflow:auto; max-height:88vh; }
+  .dlgbody h3 { margin:0 0 4px; font-size:17px; }
+  .logo-prev { display:flex; align-items:center; gap:10px; margin-top:6px; }
+  .logo-prev .logo { background:var(--bg); color:var(--text); border:1px solid var(--line); }
+  .pop-item { padding:8px 0; border-top:1px solid var(--line); }
+  .pop-item:first-of-type { border-top:0; }
+
+  #toast { position:fixed; left:50%; bottom:calc(84px + env(safe-area-inset-bottom)); transform:translateX(-50%); background:#292524; color:#fff; padding:10px 16px; border-radius:99px; font-size:14px; opacity:0; pointer-events:none; transition:opacity .2s; z-index:20; max-width:90%; text-align:center; }
+  #toast.show { opacity:1; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo" id="hLogo"></div>
+    <div>
+      <h1 id="hName"></h1>
+      <small id="hSub"></small>
+    </div>
+  </header>
+  <main id="main"></main>
+  <nav>
+    <a href="#/" data-nav="home"><span>🏠</span>Inicio</a>
+    <a href="#/clientes" data-nav="clientes"><span>👥</span>Clientes</a>
+    <a href="#/trabajos" data-nav="trabajos"><span>🔧</span>Trabajos</a>
+    <a href="#/ajustes" data-nav="ajustes"><span>⚙️</span>Ajustes</a>
+  </nav>
+</div>
+<dialog id="dlg"></dialog>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ============ Datos ============ */
+const KEY = 'caldera-app-v1';
+const DEFAULTS = {
+  settings: {
+    empresa: 'Mi empresa', logo: '', color: '#c2410c', diasAviso: 330, ultimoRespaldo: '',
+    plantilla: 'Hola {cliente}, te escribimos de {empresa}. Se acerca el mantenimiento anual de tu caldera (último servicio: {ultimo}). ¿Coordinamos una fecha? ¡Gracias!'
+  },
+  clientes: [],
+  mantenimientos: []
+};
+const TIPOS = ['Mantenimiento', 'Instalación', 'Reparación'];
+
+/* Limpia cualquier dato que viene de afuera (almacenamiento o respaldo importado):
+   tipos correctos, fechas reales e identificadores seguros. Lo inválido se descarta. */
+const txt = (v, max = 2000) => (typeof v === 'string' ? v : '').slice(0, max);
+const idSeguro = v => (typeof v === 'string' || typeof v === 'number' ? String(v) : '').replace(/[^\w-]/g, '').slice(0, 40);
+function fechaValida(s) {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const [y, m, d] = s.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d));
+  return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d;
+}
+function normalizar(d) {
+  d = (d && typeof d === 'object') ? d : {};
+  const S = { ...DEFAULTS.settings, ...((d.settings && typeof d.settings === 'object') ? d.settings : {}) };
+  S.empresa = txt(S.empresa, 80).trim() || DEFAULTS.settings.empresa;
+  S.plantilla = txt(S.plantilla, 1000).trim() || DEFAULTS.settings.plantilla;
+  S.color = /^#[0-9a-fA-F]{6}$/.test(S.color) ? S.color : DEFAULTS.settings.color;
+  S.logo = typeof S.logo === 'string' && /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(S.logo) ? S.logo : '';
+  S.diasAviso = Math.min(364, Math.max(1, parseInt(S.diasAviso, 10) || 330));
+  S.ultimoRespaldo = fechaValida(S.ultimoRespaldo) ? S.ultimoRespaldo : '';
+  const ids = new Set(), clientes = [];
+  for (const c of Array.isArray(d.clientes) ? d.clientes : []) {
+    if (!c || typeof c !== 'object') continue;
+    const id = idSeguro(c.id), nombre = txt(c.nombre, 200).trim();
+    if (!id || !nombre || ids.has(id)) continue;
+    ids.add(id);
+    clientes.push({ id, nombre, telefono: txt(c.telefono, 40).trim(), direccion: txt(c.direccion, 300).trim(), nota: txt(c.nota) });
+  }
+  const mids = new Set(), mantenimientos = [];
+  for (const m of Array.isArray(d.mantenimientos) ? d.mantenimientos : []) {
+    if (!m || typeof m !== 'object') continue;
+    const id = idSeguro(m.id), clienteId = idSeguro(m.clienteId);
+    if (!id || mids.has(id) || !ids.has(clienteId) || !fechaValida(m.fecha)) continue;
+    mids.add(id);
+    const r = { id, clienteId, fecha: m.fecha, tipo: TIPOS.includes(m.tipo) ? m.tipo : 'Mantenimiento',
+      equipo: txt(m.equipo, 200), hecho: txt(m.hecho), cambiado: txt(m.cambiado), obs: txt(m.obs), recom: txt(m.recom) };
+    if (m.pago === 'pendiente' || m.pago === 'pagado') r.pago = m.pago; // sin dato = pagado (trabajos viejos)
+    if (fechaValida(m.avisadoEl)) r.avisadoEl = m.avisadoEl;
+    mantenimientos.push(r);
+  }
+  return { settings: S, clientes, mantenimientos };
+}
+
+let db = load();
+
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) return normalizar(JSON.parse(raw));
+  } catch (e) {}
+  return normalizar({});
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(db)); }
+  catch (e) { toast('No se pudo guardar: almacenamiento lleno'); }
+}
+
+/* ============ Utilidades ============ */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const DAY = 86400000;
+const pad = n => String(n).padStart(2, '0');
+function todayStr() { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+function toUTC(s) { const [y, m, d] = s.split('-').map(Number); return Date.UTC(y, m - 1, d); }
+function fromUTC(t) { const d = new Date(t); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`; }
+function addDays(s, n) { return fromUTC(toUTC(s) + n * DAY); }
+function nextYear(s) { const [y, m, d] = s.split('-').map(Number); return fromUTC(Date.UTC(y + 1, m - 1, d)); }
+function diffDays(a, b) { return Math.round((toUTC(a) - toUTC(b)) / DAY); }
+function fmt(s) { const [y, m, d] = s.split('-'); return `${d}/${m}/${y}`; }
+function rel(n) {
+  if (n === 0) return 'hoy';
+  if (n > 0) return `en ${n} ${n === 1 ? 'día' : 'días'}`;
+  return `hace ${-n} ${n === -1 ? 'día' : 'días'}`;
+}
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* ============ Lógica de mantenimiento ============ */
+function ultimoMant(cid) {
+  return db.mantenimientos.filter(m => m.clienteId === cid).sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
+}
+function estado(c) {
+  const l = ultimoMant(c.id);
+  if (!l) return null;
+  const hoy = todayStr();
+  const aviso = addDays(l.fecha, Number(db.settings.diasAviso) || 330);
+  const prox = nextYear(l.fecha);
+  return { c, l, aviso, prox, diasAviso: diffDays(aviso, hoy), diasProx: diffDays(prox, hoy) };
+}
+
+/* WhatsApp (asume Argentina por defecto) */
+function waPhone(raw) {
+  let d = String(raw || '').replace(/\D/g, '').replace(/^00/, '');
+  if (d.startsWith('54')) { if (!d.startsWith('549') && d.length === 12) d = '549' + d.slice(2); return d; }
+  d = d.replace(/^0/, '');
+  const m = d.match(/^(\d{2,4})15(\d{6,8})$/);
+  if (m && (m[1].length + m[2].length) === 10) d = m[1] + m[2];
+  return '549' + d;
+}
+function mensaje(c, l) {
+  const s = db.settings;
+  const vars = { cliente: c.nombre, empresa: s.empresa, ultimo: l ? fmt(l.fecha) : '', proximo: l ? fmt(nextYear(l.fecha)) : '' };
+  return s.plantilla.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
+}
+function waLink(c, l) {
+  return `https://wa.me/${waPhone(c.telefono)}?text=${encodeURIComponent(mensaje(c, l))}`;
+}
+
+/* ============ Tema / cabecera ============ */
+function applyTheme() {
+  const s = db.settings;
+  document.documentElement.style.setProperty('--brand', s.color || '#c2410c');
+  document.querySelector('meta[name=theme-color]').setAttribute('content', s.color || '#c2410c');
+  $('#hName').textContent = s.empresa || 'Mi empresa';
+  $('#hLogo').innerHTML = s.logo ? `<img src="${s.logo}" alt="">` : esc((s.empresa || 'M').trim().charAt(0).toUpperCase());
+}
+
+/* ============ Diálogos ============ */
+const dlg = $('#dlg');
+function openDlg(html, onSubmit) {
+  dlg.onclose = null;
+  dlg.innerHTML = `<div class="dlgbody">${html}</div>`;
+  const f = dlg.querySelector('form');
+  if (f && onSubmit) f.addEventListener('submit', e => { e.preventDefault(); if (onSubmit(new FormData(f)) !== false) dlg.close(); });
+  dlg.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => dlg.close()));
+  if (!dlg.open) dlg.showModal();
+}
+dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+function askConfirm(msg, okLabel = 'Eliminar') {
+  return new Promise(res => {
+    let result = false;
+    dlg.innerHTML = `<div class="dlgbody"><p>${esc(msg)}</p><div class="actions"><button class="btn danger" data-r="1">${esc(okLabel)}</button><button class="btn ghost" data-r="0">Cancelar</button></div></div>`;
+    dlg.querySelectorAll('[data-r]').forEach(b => b.addEventListener('click', () => { result = b.dataset.r === '1'; dlg.close(); }));
+    dlg.onclose = () => { dlg.onclose = null; res(result); };
+    if (!dlg.open) dlg.showModal();
+  });
+}
+
+/* ============ Vistas ============ */
+let busqueda = '';
+let busquedaT = '';
+
+/* Guarda lo escrito en Ajustes (aunque no se haya tocado "Guardar") */
+function leerAjustes() {
+  const f = $('#fAjustes');
+  if (!f) return;
+  const fd = new FormData(f), s = db.settings;
+  const emp = (fd.get('empresa') || '').trim(); if (emp) s.empresa = emp;
+  if (fd.get('color')) s.color = fd.get('color');
+  const d = parseInt(fd.get('diasAviso'), 10); if (d) s.diasAviso = Math.min(364, Math.max(1, d));
+  const p = (fd.get('plantilla') || '').trim(); if (p) s.plantilla = p;
+  save();
+}
+
+function route() {
+  const h = location.hash.replace(/^#/, '') || '/';
+  const parts = h.split('/').filter(Boolean);
+  if (parts[0] === 'clientes') return { name: 'clientes' };
+  if (parts[0] === 'trabajos') return { name: 'trabajos' };
+  if (parts[0] === 'cliente' && parts[1]) return { name: 'cliente', id: parts[1] };
+  if (parts[0] === 'ajustes') return { name: 'ajustes' };
+  return { name: 'home' };
+}
+
+function render() {
+  leerAjustes(); // si había Ajustes abierto, no se pierde nada al redibujar
+  const r = route();
+  applyTheme();
+  document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.dataset.nav === (r.name === 'cliente' ? 'clientes' : r.name)));
+  let html = '', sub = '';
+  if (r.name === 'home') { html = viewHome(); sub = 'Inicio'; }
+  else if (r.name === 'clientes') { html = viewClientes(); sub = 'Clientes'; }
+  else if (r.name === 'trabajos') { html = viewTrabajos(); sub = 'Trabajos'; }
+  else if (r.name === 'cliente') { html = viewCliente(r.id); sub = 'Ficha del cliente'; }
+  else if (r.name === 'ajustes') { html = viewAjustes(); sub = 'Ajustes'; }
+  $('#hSub').textContent = sub;
+  $('#main').innerHTML = html;
+  window.scrollTo(0, 0);
+}
+
+function chipEstado(e) {
+  if (e.diasProx < 0) return `<span class="chip bad">Vencido ${rel(e.diasProx)}</span>`;
+  if (e.diasAviso <= 0) return `<span class="chip warn">Toca ${rel(e.diasProx)}</span>`;
+  return `<span class="chip good">Aviso ${rel(e.diasAviso)}</span>`;
+}
+
+function cardAviso(e) {
+  const late = e.diasProx < 0;
+  return `<div class="card due ${late ? 'late' : ''}">
+    <div class="row"><b>${esc(e.c.nombre)}</b>${chipEstado(e)}</div>
+    <div class="muted">Mantenimiento anual: ${fmt(e.prox)}</div>
+    <div class="muted">Último servicio: ${fmt(e.l.fecha)}</div>
+    ${e.l.avisadoEl ? `<div class="ok">✓ Avisado por WhatsApp el ${fmt(e.l.avisadoEl)}</div>` : ''}
+    <div class="actions">
+      <a class="btn wa" data-wa="${e.l.id}" target="_blank" rel="noopener" href="${waLink(e.c, e.l)}">${e.l.avisadoEl ? 'Volver a avisar' : 'Avisar por WhatsApp'}</a>
+      <a class="btn ghost" href="#/cliente/${e.c.id}">Ver ficha</a>
+    </div>
+  </div>`;
+}
+
+function viewHome() {
+  // Accesos principales: siempre arriba del inicio
+  const acciones = `<div class="quick"><button class="btn" data-act="nuevo-cliente">+ Nuevo cliente</button><button class="btn" data-act="nuevo-trabajo">+ Nuevo trabajo</button></div>`;
+  if (!db.clientes.length) {
+    return acciones + `<div class="card empty">
+      <p><b>Todavía no hay clientes.</b></p>
+      <p>Cargá el primero y registrá su último trabajo: la app te avisa cuándo toca el próximo.</p>
+    </div>`;
+  }
+  const est = db.clientes.map(estado).filter(Boolean);
+  const due = est.filter(e => e.diasAviso <= 0).sort((a, b) => a.diasProx - b.diasProx);
+  const soon = est.filter(e => e.diasAviso > 0).sort((a, b) => a.diasAviso - b.diasAviso).slice(0, 6);
+  const ult = [...db.mantenimientos].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 5);
+  const sin = db.clientes.filter(c => !ultimoMant(c.id)).length;
+  const nubes = db.settings.ultimoRespaldo ? diffDays(todayStr(), db.settings.ultimoRespaldo) : null;
+
+  let h = acciones;
+  if (nubes === null || nubes > 30) {
+    h += `<div class="banner">💾 ${nubes === null ? 'Todavía no hiciste ningún respaldo.' : `Tu último respaldo fue ${rel(-nubes)}.`} <a href="#/ajustes" style="color:inherit;font-weight:700">Hacer respaldo</a></div>`;
+  }
+  h += `<h2>⏰ Para avisar <span class="count">(${due.length})</span></h2>`;
+  h += due.length ? due.map(cardAviso).join('') : `<div class="card empty">No hay mantenimientos para avisar por ahora.</div>`;
+  const pend = db.mantenimientos.filter(m => esPendiente(m) && db.clientes.some(c => c.id === m.clienteId)).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  if (pend.length) {
+    h += `<h2>💲 Pendientes de pago <span class="count">(${pend.length})</span></h2><div class="list">` + pend.map(m => {
+      const c = db.clientes.find(x => x.id === m.clienteId);
+      return `<div class="item" role="button" tabindex="0" data-act="editar-mant" data-id="${m.id}"><div><b>${esc(c.nombre)}</b><span class="muted">${fmt(m.fecha)} · ${esc(m.tipo)}${m.hecho ? ' · ' + esc(m.hecho.slice(0, 50)) + (m.hecho.length > 50 ? '…' : '') : ''}</span></div><span class="chip warn">Pendiente</span></div>`;
+    }).join('') + `</div><p class="muted" style="margin:0">Tocá un trabajo para cambiarlo a "Pagado".</p>`;
+  }
+  if (soon.length) {
+    h += `<h2>Próximos avisos</h2><div class="list">` + soon.map(e => `
+      <a class="item" href="#/cliente/${e.c.id}"><div><b>${esc(e.c.nombre)}</b><span class="muted">Aviso el ${fmt(e.aviso)} · mantenimiento ${fmt(e.prox)}</span></div>${chipEstado(e)}</a>`).join('') + `</div>`;
+  }
+  h += `<h2>Últimos trabajos</h2>`;
+  h += ult.length ? `<div class="list">` + ult.map(m => {
+    const c = db.clientes.find(x => x.id === m.clienteId);
+    if (!c) return '';
+    return `<a class="item" href="#/cliente/${c.id}"><div><b>${esc(c.nombre)}</b><span class="muted">${fmt(m.fecha)} · ${esc(m.tipo)}${m.hecho ? ' · ' + esc(m.hecho.slice(0, 60)) + (m.hecho.length > 60 ? '…' : '') : ''}</span></div><span class="chev">›</span></a>`;
+  }).join('') + `</div>` : `<div class="card empty">Todavía no registraste trabajos.</div>`;
+  if (sin) h += `<p class="muted">${sin} ${sin === 1 ? 'cliente sin mantenimiento cargado' : 'clientes sin mantenimiento cargado'}. <a href="#/clientes" style="color:var(--brand)">Ver clientes</a></p>`;
+  return h;
+}
+
+function listaClientesHTML() {
+  const q = busqueda.trim().toLowerCase();
+  const arr = db.clientes
+    .filter(c => !q || c.nombre.toLowerCase().includes(q) || (c.direccion || '').toLowerCase().includes(q) || (c.telefono || '').includes(q))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  if (!arr.length) return `<div class="card empty">${db.clientes.length ? 'Sin resultados.' : 'Todavía no hay clientes.'}</div>`;
+  return arr.map(c => {
+    const e = estado(c);
+    return `<a class="item" href="#/cliente/${c.id}"><div><b>${esc(c.nombre)}</b><span class="muted">${esc(c.telefono)} · ${esc(c.direccion)}</span></div>${e ? chipEstado(e) : '<span class="chip">Sin mantenimiento</span>'}<span class="chev">›</span></a>`;
+  }).join('');
+}
+function viewClientes() {
+  return `<div class="top"><input type="search" id="q" placeholder="Buscar por nombre, dirección o teléfono" value="${esc(busqueda)}"><button class="btn" data-act="nuevo-cliente">+ Nuevo</button></div>
+    <div class="list" id="lista">${listaClientesHTML()}</div>`;
+}
+
+/* Pago: solo dos estados. Los trabajos viejos sin dato cuentan como pagados. */
+const esPendiente = m => m.pago === 'pendiente';
+const chipPago = m => esPendiente(m) ? '<span class="chip warn">Pendiente</span>' : '<span class="chip good">Pagado</span>';
+
+function mantCard(m, conCliente) {
+  const campos = [['Equipo', m.equipo], ['Qué se hizo', m.hecho], ['Qué se cambió', m.cambiado], ['Observaciones', m.obs], ['Recomendaciones', m.recom]].filter(x => x[1]);
+  const c = conCliente ? db.clientes.find(x => x.id === m.clienteId) : null;
+  const chips = `<span class="chips"><span class="chip">${esc(m.tipo)}</span>${chipPago(m)}</span>`;
+  return `<div class="card">
+    ${c ? `<div class="row"><a href="#/cliente/${c.id}" style="color:inherit;font-weight:700;font-size:17px;text-decoration:none">${esc(c.nombre)} ›</a>${chips}</div><div class="muted">${fmt(m.fecha)}</div>`
+        : `<div class="row"><b>${fmt(m.fecha)}</b>${chips}</div>`}
+    <div class="fields">${campos.map(([k, v]) => `<div><b>${k}</b>${esc(v)}</div>`).join('') || '<span class="muted">Sin detalles cargados.</span>'}</div>
+    <div class="actions"><button class="btn ghost small" data-act="editar-mant" data-id="${m.id}">Editar</button><button class="btn ghost small" data-act="borrar-mant" data-id="${m.id}">Eliminar</button></div>
+  </div>`;
+}
+function textoTrabajo(m) {
+  const c = db.clientes.find(x => x.id === m.clienteId);
+  return [c ? c.nombre : '', m.tipo, esPendiente(m) ? 'pendiente' : 'pagado', m.equipo, m.hecho, m.cambiado, m.obs, m.recom].join(' ').toLowerCase();
+}
+function listaTrabajosHTML() {
+  const q = busquedaT.trim().toLowerCase();
+  const arr = db.mantenimientos.filter(m => db.clientes.some(c => c.id === m.clienteId) && (!q || textoTrabajo(m).includes(q)))
+    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+  if (!arr.length) return `<div class="card empty">${db.mantenimientos.length ? 'Sin resultados.' : 'Todavía no registraste trabajos.'}</div>`;
+  return arr.map(m => mantCard(m, true)).join('');
+}
+function viewTrabajos() {
+  return `<div class="top"><input type="search" id="qt" placeholder="Buscar cliente o detalle" value="${esc(busquedaT)}"><button class="btn" data-act="nuevo-trabajo">+ Nuevo</button></div>
+    <div class="list" id="listaT">${listaTrabajosHTML()}</div>`;
+}
+
+function viewCliente(id) {
+  const c = db.clientes.find(x => x.id === id);
+  if (!c) return `<div class="card empty">No se encontró el cliente. <a class="back" href="#/clientes">Volver</a></div>`;
+  const e = estado(c);
+  const hist = db.mantenimientos.filter(m => m.clienteId === id).sort((a, b) => b.fecha.localeCompare(a.fecha));
+  const l = hist[0];
+  return `<a class="back" href="#/clientes">‹ Clientes</a>
+    <div class="card">
+      <div class="row"><b style="font-size:18px">${esc(c.nombre)}</b>${e ? chipEstado(e) : ''}</div>
+      <div class="fields">
+        <div><b>Teléfono</b>${esc(c.telefono)}</div>
+        <div><b>Dirección</b>${esc(c.direccion)}</div>
+        ${c.nota ? `<div><b>Nota</b>${esc(c.nota)}</div>` : ''}
+        ${e ? `<div><b>Próximo mantenimiento</b>${fmt(e.prox)} (${rel(e.diasProx)}) · aviso el ${fmt(e.aviso)}</div>` : ''}
+      </div>
+      <div class="actions">
+        <a class="btn wa" data-wa="${l ? l.id : ''}" target="_blank" rel="noopener" href="${waLink(c, l)}">WhatsApp</a>
+        <button class="btn ghost" data-act="editar-cliente" data-id="${c.id}">Editar</button>
+        <button class="btn ghost" data-act="borrar-cliente" data-id="${c.id}">Eliminar</button>
+      </div>
+    </div>
+    <div class="row"><h2>Historial <span class="count">(${hist.length})</span></h2><button class="btn small" data-act="nuevo-mant" data-id="${c.id}">+ Registrar trabajo</button></div>
+    ${hist.length ? hist.map(m => mantCard(m)).join('') : `<div class="card empty">Sin trabajos registrados. Cargá el último mantenimiento para activar el aviso.</div>`}`;
+}
+
+let installEvt = null;
+function viewAjustes() {
+  const s = db.settings;
+  return `<form class="card" id="fAjustes">
+      <h2 style="margin-top:0">Empresa</h2>
+      <label>Nombre de la empresa</label>
+      <input name="empresa" value="${esc(s.empresa)}" required>
+      <label>Logo <span class="opt">(opcional)</span></label>
+      <div class="logo-prev"><div class="logo">${s.logo ? `<img src="${s.logo}" alt="">` : esc((s.empresa || 'M').charAt(0).toUpperCase())}</div>
+        <input type="file" id="logoFile" accept="image/*">
+        ${s.logo ? '<button type="button" class="btn ghost small" data-act="quitar-logo">Quitar</button>' : ''}</div>
+      <label>Color principal</label>
+      <input type="color" name="color" value="${esc(s.color)}" style="height:44px;padding:4px">
+      <h2>Recordatorio</h2>
+      <label>Días después del último trabajo para avisar</label>
+      <input type="number" name="diasAviso" min="1" max="364" value="${esc(s.diasAviso)}" required>
+      <div class="hint">330 días = unos 35 días antes del próximo mantenimiento anual.</div>
+      <label>Mensaje de WhatsApp</label>
+      <textarea name="plantilla" required style="min-height:110px">${esc(s.plantilla)}</textarea>
+      <div class="hint">Podés usar: {cliente} {empresa} {ultimo} {proximo}</div>
+      <div class="actions"><button class="btn" type="submit">Guardar ajustes</button></div>
+    </form>
+    <div class="card">
+      <h2 style="margin-top:0">Respaldo</h2>
+      <p class="muted">Los datos se guardan en este dispositivo. "Guardar respaldo" descarga un archivo en el celular (carpeta Descargas). Para recuperar los datos, tocá "Restaurar respaldo" y elegí ese archivo.</p>
+      <p class="muted">Último respaldo: ${s.ultimoRespaldo ? fmt(s.ultimoRespaldo) : 'nunca'}</p>
+      <div class="actions">
+        <button class="btn" data-act="exportar">Guardar respaldo</button>
+        <button class="btn ghost" data-act="importar">Restaurar respaldo</button>
+      </div>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+    </div>
+    ${installEvt ? `<div class="card"><h2 style="margin-top:0">Instalar</h2><p class="muted">Instalá la app en tu pantalla de inicio.</p><div class="actions"><button class="btn" data-act="instalar">Instalar app</button></div></div>` : ''}`;
+}
+
+/* ============ Formularios ============ */
+function formCliente(c, despues) {
+  const v = c || {};
+  openDlg(`<h3>${c ? 'Editar cliente' : 'Nuevo cliente'}</h3>
+    <form>
+      <label>Nombre <span class="req">*</span></label><input name="nombre" required value="${esc(v.nombre)}" placeholder="Nombre y apellido">
+      <label>Teléfono (WhatsApp) <span class="req">*</span></label><input name="telefono" type="tel" required value="${esc(v.telefono)}" placeholder="Ej: 299 000 0000">
+      <label>Dirección <span class="req">*</span></label><input name="direccion" required value="${esc(v.direccion)}" placeholder="Calle, número, localidad">
+      <label>Nota <span class="opt">(opcional)</span></label><textarea name="nota" placeholder="Cualquier dato útil sobre el cliente">${esc(v.nota)}</textarea>
+      <div class="actions"><button class="btn" type="submit">Guardar</button><button class="btn ghost" type="button" data-close>Cancelar</button></div>
+    </form>`, fd => {
+    const data = { nombre: fd.get('nombre').trim(), telefono: fd.get('telefono').trim(), direccion: fd.get('direccion').trim(), nota: fd.get('nota').trim() };
+    if (!data.nombre || !data.telefono || !data.direccion) { toast('Completá los campos obligatorios'); return false; }
+    let guardado = c;
+    if (c) Object.assign(c, data); else { guardado = { id: uid(), ...data }; db.clientes.push(guardado); }
+    save(); toast('Cliente guardado'); render();
+    if (despues) setTimeout(() => despues(guardado), 0);
+  });
+}
+
+function opcionesClientes(sel, filtro) {
+  const q = (filtro || '').trim().toLowerCase();
+  const arr = db.clientes.filter(c => c.id === sel || !q || c.nombre.toLowerCase().includes(q) || (c.direccion || '').toLowerCase().includes(q))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  return `<option value="">Elegí un cliente…</option>` + arr.map(c => `<option value="${c.id}" ${c.id === sel ? 'selected' : ''}>${esc(c.nombre)} · ${esc(c.direccion)}</option>`).join('');
+}
+
+function formMant(clienteId, m, borrador) {
+  const v = m || borrador || { fecha: todayStr(), tipo: 'Mantenimiento' };
+  const tipos = TIPOS;
+  const pagoSel = m ? (esPendiente(m) ? 'pendiente' : 'pagado') : (v.pago === 'pagado' ? 'pagado' : 'pendiente');
+  openDlg(`<h3>${m ? 'Editar trabajo' : 'Nuevo trabajo'}</h3>
+    <form>
+      <label>Cliente <span class="req">*</span></label>
+      ${db.clientes.length > 6 ? '<input type="search" id="fcBuscar" placeholder="Buscar cliente por nombre o dirección" style="margin-bottom:6px">' : ''}
+      <select name="clienteId" id="fcSel" required>${opcionesClientes(clienteId)}</select>
+      <div class="actions"><button class="btn ghost small" type="button" id="fcNuevo">+ Cliente nuevo</button></div>
+      <label>Fecha <span class="req">*</span></label><input type="date" name="fecha" required value="${esc(v.fecha)}" max="${todayStr()}">
+      <label>Tipo</label><select name="tipo">${tipos.map(t => `<option ${t === v.tipo ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      <label>Pago</label><select name="pago"><option value="pendiente" ${pagoSel === 'pendiente' ? 'selected' : ''}>Pendiente</option><option value="pagado" ${pagoSel === 'pagado' ? 'selected' : ''}>Pagado</option></select>
+      <label>Equipo <span class="opt">(opcional)</span></label><input name="equipo" value="${esc(v.equipo)}" placeholder="Marca / modelo de la caldera">
+      <label>Qué se hizo</label><textarea name="hecho" placeholder="Limpieza, control de presión, etc.">${esc(v.hecho)}</textarea>
+      <label>Qué se cambió</label><textarea name="cambiado" placeholder="Repuestos reemplazados">${esc(v.cambiado)}</textarea>
+      <label>Observaciones</label><textarea name="obs">${esc(v.obs)}</textarea>
+      <label>Recomendaciones</label><textarea name="recom">${esc(v.recom)}</textarea>
+      <div class="actions"><button class="btn" type="submit">Guardar</button><button class="btn ghost" type="button" data-close>Cancelar</button></div>
+    </form>`, fd => {
+    const data = { clienteId: fd.get('clienteId'), fecha: fd.get('fecha'), tipo: fd.get('tipo'), pago: fd.get('pago') === 'pagado' ? 'pagado' : 'pendiente', equipo: fd.get('equipo').trim(), hecho: fd.get('hecho').trim(), cambiado: fd.get('cambiado').trim(), obs: fd.get('obs').trim(), recom: fd.get('recom').trim() };
+    if (!data.clienteId) { toast('Elegí un cliente'); return false; }
+    if (!data.fecha) { toast('Falta la fecha'); return false; }
+    if (m) { if (m.fecha !== data.fecha || m.clienteId !== data.clienteId) delete m.avisadoEl; Object.assign(m, data); }
+    else db.mantenimientos.push({ id: uid(), ...data });
+    save(); toast('Trabajo guardado'); render();
+  });
+  const form = dlg.querySelector('form');
+  const sel = $('#fcSel');
+  const buscar = $('#fcBuscar');
+  if (buscar) buscar.addEventListener('input', () => { sel.innerHTML = opcionesClientes(sel.value, buscar.value); });
+  $('#fcNuevo').addEventListener('click', () => {
+    const fd = new FormData(form);
+    const draft = { fecha: fd.get('fecha'), tipo: fd.get('tipo'), pago: fd.get('pago'), equipo: fd.get('equipo'), hecho: fd.get('hecho'), cambiado: fd.get('cambiado'), obs: fd.get('obs'), recom: fd.get('recom') };
+    formCliente(null, nuevo => formMant(nuevo.id, null, draft));
+  });
+}
+
+/* ============ Respaldo ============ */
+async function exportar() {
+  const json = JSON.stringify({ app: 'caldera', version: 1, exportado: new Date().toISOString(), settings: db.settings, clientes: db.clientes, mantenimientos: db.mantenimientos }, null, 1);
+  const name = `respaldo-${db.settings.empresa.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w-]+/g, '_')}-${todayStr()}.json`;
+  const file = new File([json], name, { type: 'application/json' });
+  // Se guarda directamente en el dispositivo (carpeta de Descargas)
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(file); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  marcarRespaldo();
+}
+function marcarRespaldo() { db.settings.ultimoRespaldo = todayStr(); save(); toast('Respaldo guardado en Descargas'); if (route().name === 'ajustes') render(); }
+
+async function importar(file) {
+  try {
+    const d = JSON.parse(await file.text());
+    if (!d || !Array.isArray(d.clientes) || !Array.isArray(d.mantenimientos)) throw new Error('formato');
+    const nuevo = normalizar(d);
+    const omitidos = (d.clientes.length - nuevo.clientes.length) + (d.mantenimientos.length - nuevo.mantenimientos.length);
+    if (!(await askConfirm(`Esto reemplaza todos los datos actuales por los del respaldo (${nuevo.clientes.length} clientes, ${nuevo.mantenimientos.length} trabajos). ¿Continuar?`, 'Restaurar'))) return;
+    db = nuevo;
+    save(); $('#main').innerHTML = ''; // evita que el formulario viejo pise los datos restaurados
+    toast(omitidos ? `Respaldo restaurado (se omitieron ${omitidos} registros inválidos)` : 'Respaldo restaurado'); render();
+  } catch (e) { toast('El archivo no es un respaldo válido'); }
+}
+
+function cargarLogo(file) {
+  leerAjustes();
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    const max = 256, k = Math.min(1, max / Math.max(img.width, img.height));
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    db.settings.logo = cv.toDataURL('image/png');
+    URL.revokeObjectURL(url); save(); toast('Logo actualizado'); render();
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); toast('No se pudo leer la imagen'); };
+  img.src = url;
+}
+
+/* ============ Eventos ============ */
+document.addEventListener('click', async e => {
+  const wa = e.target.closest('[data-wa]');
+  if (wa && wa.dataset.wa) {
+    const m = db.mantenimientos.find(x => x.id === wa.dataset.wa);
+    if (m) { m.avisadoEl = todayStr(); save(); setTimeout(render, 400); }
+    return;
+  }
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const act = b.dataset.act, id = b.dataset.id;
+  if (act === 'nuevo-cliente') formCliente();
+  else if (act === 'editar-cliente') formCliente(db.clientes.find(c => c.id === id));
+  else if (act === 'borrar-cliente') {
+    if (await askConfirm('¿Eliminar este cliente y todo su historial? No se puede deshacer.')) {
+      db.clientes = db.clientes.filter(c => c.id !== id);
+      db.mantenimientos = db.mantenimientos.filter(m => m.clienteId !== id);
+      save(); toast('Cliente eliminado'); location.hash = '#/clientes';
+    }
+  }
+  else if (act === 'nuevo-trabajo') formMant('');
+  else if (act === 'nuevo-mant') formMant(id);
+  else if (act === 'editar-mant') { const m = db.mantenimientos.find(x => x.id === id); formMant(m.clienteId, m); }
+  else if (act === 'borrar-mant') {
+    if (await askConfirm('¿Eliminar este trabajo del historial?')) { db.mantenimientos = db.mantenimientos.filter(m => m.id !== id); save(); render(); }
+  }
+  else if (act === 'quitar-logo') { db.settings.logo = ''; save(); render(); }
+  else if (act === 'exportar') exportar();
+  else if (act === 'importar') $('#importFile').click();
+  else if (act === 'instalar' && installEvt) { installEvt.prompt(); installEvt = null; render(); }
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'q') { busqueda = e.target.value; $('#lista').innerHTML = listaClientesHTML(); }
+  if (e.target.id === 'qt') { busquedaT = e.target.value; $('#listaT').innerHTML = listaTrabajosHTML(); }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'logoFile') { if (e.target.files[0]) cargarLogo(e.target.files[0]); return; }
+  if (e.target.id === 'importFile') { if (e.target.files[0]) importar(e.target.files[0]); return; }
+  if (e.target.closest && e.target.closest('#fAjustes')) { leerAjustes(); applyTheme(); } // se guarda solo al cambiar cada dato
+});
+document.addEventListener('submit', e => {
+  if (e.target.id !== 'fAjustes') return;
+  e.preventDefault();
+  leerAjustes(); toast('Ajustes guardados'); render();
+});
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.item[data-act]')) { e.preventDefault(); e.target.click(); }
+});
+window.addEventListener('hashchange', render);
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if (route().name === 'ajustes') render(); });
+
+/* ============ Cartito al abrir ============ */
+function cartito() {
+  try { if (sessionStorage.getItem('cartito')) return; } catch (e) {}
+  const due = db.clientes.map(estado).filter(e => e && e.diasAviso <= 0 && !e.l.avisadoEl).sort((a, b) => a.diasProx - b.diasProx);
+  if (!due.length) return;
+  try { sessionStorage.setItem('cartito', '1'); } catch (e) {}
+  const mostrar = due.slice(0, 5);
+  openDlg(`<h3>🔔 Acordate</h3>
+    <p class="muted" style="margin-top:0">Tenés ${due.length} ${due.length === 1 ? 'mantenimiento para avisar' : 'mantenimientos para avisar'}:</p>
+    ${mostrar.map(e => `<div class="pop-item"><b>${esc(e.c.nombre)}</b><div class="muted">Mantenimiento ${fmt(e.prox)} · ${rel(e.diasProx)}</div></div>`).join('')}
+    ${due.length > 5 ? `<p class="muted">…y ${due.length - 5} más.</p>` : ''}
+    <div class="actions"><button class="btn" data-close>Ver avisos</button></div>`);
+  if (route().name !== 'home') location.hash = '#/';
+}
+
+/* ============ Inicio ============ */
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+render();
+cartito();
+</script>
+</body>
+</html>

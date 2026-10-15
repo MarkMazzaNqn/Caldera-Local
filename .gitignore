@@ -1,0 +1,14 @@
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/
+.idea/
+
+# Dependencias y logs (por si se agregan herramientas)
+node_modules/
+*.log
+
+# IMPORTANTE: los respaldos contienen datos de clientes, nunca se suben
+respaldo-*.json
